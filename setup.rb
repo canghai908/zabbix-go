@@ -35,9 +35,11 @@ File.open('/etc/php5/apache2/php.ini', 'a') do |f|
   f.puts 'date.timezone = UTC'
 end
 run('apt-get install -y zabbix-server-pgsql zabbix-frontend-php')
-
-conf = File.read('/etc/dbconfig-common/zabbix-server-pgsql.conf')
-password = /dbc_dbpass='(\w+)'/.match(conf)[1]
+run('sudo -u postgres createuser --pwprompt zabbix')
+run('sudo -u postgres createdb -O zabbix zabbix')
+zcat('/usr/share/doc/zabbix-server-pgsql/create.sql.gz | sudo -u zabbix psql zabbix')
+#conf = File.read('/etc/dbconfig-common/zabbix-server-pgsql.conf')
+#password = /dbc_dbpass='(\w+)'/.match(conf)[1]
 
 File.open('/usr/share/zabbix/conf/zabbix.conf.php', 'w') do |f| f.puts <<-END
   <?php
@@ -49,7 +51,7 @@ File.open('/usr/share/zabbix/conf/zabbix.conf.php', 'w') do |f| f.puts <<-END
   $DB['PORT']     = '0';
   $DB['DATABASE'] = 'zabbix';
   $DB['USER']     = 'zabbix';
-  $DB['PASSWORD'] = '#{password}';
+  $DB['PASSWORD'] = 'zabbix';
 
   // SCHEMA is relevant only for IBM_DB2 database
   $DB['SCHEMA'] = '';
