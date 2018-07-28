@@ -1,7 +1,7 @@
 package zabbix_test
 
 import (
-	. "github.com/canghai908/go-zabbix"
+	. "github.com/canghai908/zabbix-go"
 	"log"
 	"math/rand"
 	"net/http"

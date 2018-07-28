@@ -2,7 +2,7 @@ package zabbix_test
 
 import (
 	"fmt"
-	. "github.com/canghai908/go-zabbix"
+	. "github.com/canghai908/zabbix-go"
 	"math/rand"
 	"reflect"
 	"testing"
