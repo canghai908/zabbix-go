@@ -22,7 +22,7 @@ run("add-apt-repository 'deb http://repo.zabbix.com/zabbix/#{ZABBIX_VERSION}/ubu
 #   The following packages have unmet dependencies:
 #   zabbix-server-pgsql : Depends: libiodbc2 (>= 3.52.7) but it is not going to be installed
 #   E: Unable to correct problems, you have held broken packages.
-#run("add-apt-repository 'deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main'")
+run("add-apt-repository 'deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main'")
 run('apt-get purge -y postgresql.*')
 run('apt-get autoremove --purge')
 run('rm -fr /var/lib/postgresql /etc/postgresql')
