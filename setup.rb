@@ -24,8 +24,8 @@ run("add-apt-repository 'deb http://repo.zabbix.com/zabbix/#{ZABBIX_VERSION}/ubu
 #   E: Unable to correct problems, you have held broken packages.
 #run("add-apt-repository 'deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main'")
 #run('apt-get purge -y postgresql.*')
-run('apt-get autoremove --purge')
-run('rm -fr /var/lib/postgresql /etc/postgresql')
+#run('apt-get autoremove --purge')
+#run('rm -fr /var/lib/postgresql /etc/postgresql')
 
 run('apt-get update')
 #run('apt-get install -y postgresql-9.3')
