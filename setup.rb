@@ -25,6 +25,7 @@ run("add-apt-repository 'deb http://repo.zabbix.com/zabbix/#{ZABBIX_VERSION}/ubu
 run("add-apt-repository 'deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main'")
 run('apt-get purge -y postgresql.*')
 run('apt-get autoremove --purge')
+run('/etc/init.d/postgresql stop')
 run('rm -fr /var/lib/postgresql /etc/postgresql')
 
 run('apt-get update')
