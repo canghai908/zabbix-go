@@ -27,7 +27,6 @@ run('apt-get purge -y postgresql.*')
 run('apt-get autoremove --purge')
 run('/etc/init.d/postgresql stop')
 run('rm -fr /var/lib/postgresql /etc/postgresql')
-
 run('apt-get update')
 #run('apt-get install -y postgresql-9.3')
 run('apt-get install -y apache2 libapache2-mod-php5 php5-pgsql')
