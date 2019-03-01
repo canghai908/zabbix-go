@@ -50,7 +50,7 @@ const (
 // https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/definitions
 type Item struct {
 	ItemId      string    `json:"itemid,omitempty"`
-	Delay       int       `json:"delay"`
+	Delay       string    `json:"delay"`
 	HostId      string    `json:"hostid"`
 	InterfaceId string    `json:"interfaceid,omitempty"`
 	Key         string    `json:"key_"`
@@ -61,8 +61,11 @@ type Item struct {
 	Delta       DeltaType `json:"delta"`
 	Description string    `json:"description"`
 	Error       string    `json:"error"`
-	History     int       `json:"history,omitempty"`
-	Trends      int       `json:"trends,omitempty"`
+	History     string    `json:"history,omitempty"`
+	Trends      string    `json:"trends,omitempty"`
+	Lastvalue   string    `json:"lastvalue"`
+	Lastclock   int64     `json:"lastclock"`
+	Prevvalue   string    `json:"prevvalue"`
 
 	// Fields below used only when creating applications
 	ApplicationIds []string `json:"applications,omitempty"`

@@ -42,7 +42,6 @@ func (api *API) HostsGet(params Params) (res Hosts, err error) {
 	if err != nil {
 		return
 	}
-
 	reflector.MapsToStructs2(response.Result.([]interface{}), &res, reflector.Strconv, "json")
 	return
 }
