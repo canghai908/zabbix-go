@@ -2,12 +2,14 @@ package zabbix
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"sync/atomic"
+	"time"
 )
 
 type (
@@ -89,7 +91,11 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 		return
 	}
 	api.printf("Request (POST): %s", b)
-
+	// make the http client
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Timeout: 5 * time.Second, Transport: tr}
 	req, err := http.NewRequest("POST", api.url, bytes.NewReader(b))
 	if err != nil {
 		return
@@ -98,7 +104,7 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 	req.Header.Add("Content-Type", "application/json-rpc")
 	req.Header.Add("User-Agent", "github.com/AlekSi/zabbix")
 
-	res, err := api.c.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		api.printf("Error   : %s", err)
 		return
