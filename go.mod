@@ -1,5 +1,3 @@
-module github.com/canghai908/zabbix-go
+module zabbix-go
 
-go 1.14
-
-require github.com/AlekSi/reflector v0.4.1
+go 1.18

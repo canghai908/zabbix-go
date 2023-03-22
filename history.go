@@ -1,7 +1,7 @@
 package zabbix
 
 import (
-	"github.com/AlekSi/reflector"
+	"github.com/canghai908/reflector"
 )
 
 type HistoryItem struct {
