@@ -8,13 +8,15 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
 
-type (
-	Params map[string]interface{}
-)
+type Params map[string]interface{}
+
+var New bool
 
 type request struct {
 	Jsonrpc string      `json:"jsonrpc"`
@@ -86,6 +88,10 @@ func (api *API) printf(format string, v ...interface{}) {
 func (api *API) callBytes(method string, params interface{}) (b []byte, err error) {
 	id := atomic.AddInt32(&api.id, 1)
 	jsonobj := request{"2.0", method, params, api.Auth, id}
+	//zabbix version >= 6.4
+	if New {
+		jsonobj = request{"2.0", method, params, "", id}
+	}
 	b, err = json.Marshal(jsonobj)
 	if err != nil {
 		return
@@ -103,15 +109,21 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 	req.ContentLength = int64(len(b))
 	req.Header.Add("Content-Type", "application/json-rpc")
 	req.Header.Add("User-Agent", "github.com/AlekSi/zabbix")
-
+	//zabbix version >= 6.4
+	if New {
+		req.Header.Add("Authorization", "Bearer "+api.Auth)
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		api.printf("Error   : %s", err)
 		return
 	}
 	defer res.Body.Close()
-
 	b, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		api.printf("Error   : %s", err)
+		return
+	}
 	api.printf("Response (%d): %s", res.StatusCode, b)
 	return
 }
@@ -138,12 +150,28 @@ func (api *API) CallWithError(method string, params interface{}) (response Respo
 // Calls "user.login" API method and fills api.Auth field.
 // This method modifies API structure and should not be called concurrently with other methods.
 func (api *API) Login(user, password string) (auth string, err error) {
+	version, err := api.Version()
+	if err != nil {
+		return
+	}
+	verArr := strings.Split(version, ".")
+	ZbxMasterVer, _ := strconv.ParseInt(verArr[0], 10, 64)
+	ZbxMiddleVer, _ := strconv.ParseInt(verArr[1], 10, 64)
+	//zabbix version > 6.4
+	if ZbxMasterVer > 6 || (ZbxMasterVer == 6 && ZbxMiddleVer == 4) {
+		New = true
+	} else {
+		New = false
+	}
 	params := map[string]string{"user": user, "password": password}
+	//zabbix version >= 6.4
+	if New {
+		params = map[string]string{"username": user, "password": password}
+	}
 	response, err := api.CallWithError("user.login", params)
 	if err != nil {
 		return
 	}
-
 	auth = response.Result.(string)
 	api.Auth = auth
 	return
