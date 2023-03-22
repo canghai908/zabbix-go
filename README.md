@@ -4,7 +4,11 @@ zabbix [![GoDoc](https://godoc.org/github.com/AlekSi/zabbix?status.svg)](https:/
 This Go package provides access to Zabbix API. 
 
 | Zabbix Version | Compatibility |
-| :------------- | :------------ |
+|:---------------| :------------ |
+| 6.4.x          | ✅            |
+| 6.2.x          | ✅            |
+| 6.0.x LTS      | ✅            |
+| 5.4.x          | ✅            |
 | 5.2.x          | ✅            |
 | 5.0.x LTS      | ✅            |
 | 4.4.x          | ✅            |
