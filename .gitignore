@@ -1,1 +1,5 @@
 .vagrant/
+/.idea/zabbix-go.iml
+/.idea/vcs.xml
+/.idea/modules.xml
+/.idea/.gitignore
