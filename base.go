@@ -16,7 +16,7 @@ import (
 
 type Params map[string]interface{}
 
-var New bool
+var isZbx64 bool
 
 type request struct {
 	Jsonrpc string      `json:"jsonrpc"`
@@ -58,8 +58,11 @@ func (e *ExpectedMore) Error() string {
 	return fmt.Sprintf("Expected %d, got %d.", e.Expected, e.Got)
 }
 
+// 为了向后兼容，保留Auth字段但添加警告注释
 type API struct {
-	Auth   string      // auth token, filled by Login()
+	// Auth token, filled by Login() or SetAuth()
+	// Warning: Do not set Auth directly, use SetAuth() instead to ensure proper version detection
+	Auth   string
 	Logger *log.Logger // request/response logger, nil by default
 	url    string
 	c      http.Client
@@ -87,16 +90,37 @@ func (api *API) printf(format string, v ...interface{}) {
 
 func (api *API) callBytes(method string, params interface{}) (b []byte, err error) {
 	id := atomic.AddInt32(&api.id, 1)
-	jsonobj := request{"2.0", method, params, api.Auth, id}
-	//zabbix version >= 6.4
-	if New {
-		jsonobj = request{"2.0", method, params, "", id}
+	var jsonobj request
+
+	// 7.2及以上版本完全不需要auth字段
+	if isZbx64 {
+		jsonobj = request{
+			Jsonrpc: "2.0",
+			Method:  method,
+			Params:  params,
+			Id:      id,
+		}
+	} else {
+		// 6.4以下版本需要auth字段
+		auth := ""
+		if method != "APIInfo.version" {
+			auth = api.Auth
+		}
+		jsonobj = request{
+			Jsonrpc: "2.0",
+			Method:  method,
+			Params:  params,
+			Auth:    auth,
+			Id:      id,
+		}
 	}
+
 	b, err = json.Marshal(jsonobj)
 	if err != nil {
 		return
 	}
 	api.printf("Request (POST): %s", b)
+
 	// make the http client
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -109,16 +133,19 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 	req.ContentLength = int64(len(b))
 	req.Header.Add("Content-Type", "application/json-rpc")
 	req.Header.Add("User-Agent", "github.com/AlekSi/zabbix")
-	//zabbix version >= 6.4
-	if New {
+
+	// 6.4及以上版本使用Bearer认证
+	if isZbx64 && method != "APIInfo.version" {
 		req.Header.Add("Authorization", "Bearer "+api.Auth)
 	}
+
 	res, err := client.Do(req)
 	if err != nil {
 		api.printf("Error   : %s", err)
 		return
 	}
 	defer res.Body.Close()
+
 	b, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		api.printf("Error   : %s", err)
@@ -150,24 +177,22 @@ func (api *API) CallWithError(method string, params interface{}) (response Respo
 // Calls "user.login" API method and fills api.Auth field.
 // This method modifies API structure and should not be called concurrently with other methods.
 func (api *API) Login(user, password string) (auth string, err error) {
-	version, err := api.Version()
+	// 先获取版本并设置isZbx64
+	_, err = api.Version()
 	if err != nil {
 		return
 	}
-	verArr := strings.Split(version, ".")
-	ZbxMasterVer, _ := strconv.ParseInt(verArr[0], 10, 64)
-	ZbxMiddleVer, _ := strconv.ParseInt(verArr[1], 10, 64)
-	//zabbix version > 6.4
-	if ZbxMasterVer > 6 || (ZbxMasterVer == 6 && ZbxMiddleVer == 4) {
-		New = true
-	} else {
-		New = false
+
+	key := "user"
+	if isZbx64 {
+		key = "username"
 	}
-	params := map[string]string{"user": user, "password": password}
-	//zabbix version >= 6.4
-	if New {
-		params = map[string]string{"username": user, "password": password}
+
+	params := map[string]string{
+		key:        user,
+		"password": password,
 	}
+
 	response, err := api.CallWithError("user.login", params)
 	if err != nil {
 		return
@@ -178,23 +203,28 @@ func (api *API) Login(user, password string) (auth string, err error) {
 }
 
 // Calls "APIInfo.version" API method.
-// This method temporary modifies API structure and should not be called concurrently with other methods.
 func (api *API) Version() (v string, err error) {
-	// temporary remove auth for this method to succeed
-	// https://www.zabbix.com/documentation/2.2/manual/appendix/api/apiinfo/version
-	auth := api.Auth
-	api.Auth = ""
+	// APIInfo.version 方法不需要认证
 	response, err := api.CallWithError("APIInfo.version", Params{})
-	api.Auth = auth
-
-	// despite what documentation says, Zabbix 2.2 requires auth, so we try again
-	if e, ok := err.(*Error); ok && e.Code == -32602 {
-		response, err = api.CallWithError("APIInfo.version", Params{})
-	}
 	if err != nil {
 		return
 	}
 
 	v = response.Result.(string)
+
+	// 判断版本并设置认证方式
+	verArr := strings.Split(v, ".")
+	ZbxMasterVer, _ := strconv.ParseInt(verArr[0], 10, 64)
+	ZbxMiddleVer, _ := strconv.ParseInt(verArr[1], 10, 64)
+
+	isZbx64 = ZbxMasterVer > 6 || (ZbxMasterVer == 6 && ZbxMiddleVer >= 4)
 	return
+}
+
+// SetAuth sets the authentication token and determines the Zabbix version
+func (api *API) SetAuth(auth string) error {
+	api.Auth = auth
+	// 获取版本并设置isZbx64
+	_, err := api.Version()
+	return err
 }
