@@ -6,7 +6,7 @@ This Go package provides access to Zabbix API.
 | :------------- | :------------ |
 | 7.4.x          | ✅            |
 | 7.2.x          | ✅            |
-| 7.0.x          | ✅            |
+| 7.0.x LTS      | ✅            |
 | 6.4.x          | ✅            |
 | 6.2.x          | ✅            |
 | 6.0.x LTS      | ✅            |
