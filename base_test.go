@@ -1,7 +1,6 @@
 package zabbix_test
 
 import (
-	. "github.com/canghai908/zabbix-go"
 	"log"
 	"math/rand"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 	"regexp"
 	"testing"
 	"time"
+
+	. "github.com/canghai908/zabbix-go"
 )
 
 var (
@@ -26,9 +27,8 @@ func init() {
 	}
 	_host += "-testing"
 
-	if os.Getenv("TEST_ZABBIX_URL") == "" {
-		log.Fatal("Set environment variables TEST_ZABBIX_URL (and optionally TEST_ZABBIX_USER and TEST_ZABBIX_PASSWORD)")
-	}
+	// Only require TEST_ZABBIX_URL for API tests, not for sender/get protocol tests
+	// Tests that need it will check in getAPI() function
 }
 
 func getHost() string {
@@ -40,7 +40,12 @@ func getAPI(t *testing.T) *API {
 		return _api
 	}
 
-	url, user, password := os.Getenv("TEST_ZABBIX_URL"), os.Getenv("TEST_ZABBIX_USER"), os.Getenv("TEST_ZABBIX_PASSWORD")
+	url := os.Getenv("TEST_ZABBIX_URL")
+	if url == "" {
+		t.Skip("Set TEST_ZABBIX_URL environment variable to run API tests")
+	}
+
+	user, password := os.Getenv("TEST_ZABBIX_USER"), os.Getenv("TEST_ZABBIX_PASSWORD")
 	_api = NewAPI(url)
 	_api.SetClient(http.DefaultClient)
 	v := os.Getenv("TEST_ZABBIX_VERBOSE")

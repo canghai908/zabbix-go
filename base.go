@@ -16,7 +16,15 @@ import (
 
 type Params map[string]interface{}
 
-var isZbx64 bool
+// VersionInfo holds Zabbix version information
+type VersionInfo struct {
+	Version     string
+	Major       int64
+	Minor       int64
+	Patch       int64
+	UseBearer   bool // true for Zabbix 7.4+
+	UseUsername bool // true for Zabbix 6.4+
+}
 
 type request struct {
 	Jsonrpc string      `json:"jsonrpc"`
@@ -58,15 +66,16 @@ func (e *ExpectedMore) Error() string {
 	return fmt.Sprintf("Expected %d, got %d.", e.Expected, e.Got)
 }
 
-// 为了向后兼容，保留Auth字段但添加警告注释
+// API provides access to Zabbix API
 type API struct {
 	// Auth token, filled by Login() or SetAuth()
 	// Warning: Do not set Auth directly, use SetAuth() instead to ensure proper version detection
-	Auth   string
-	Logger *log.Logger // request/response logger, nil by default
-	url    string
-	c      http.Client
-	id     int32
+	Auth        string
+	Logger      *log.Logger // request/response logger, nil by default
+	url         string
+	c           http.Client
+	id          int32
+	versionInfo *VersionInfo // cached version information
 }
 
 // Creates new API access object.
@@ -89,11 +98,24 @@ func (api *API) printf(format string, v ...interface{}) {
 }
 
 func (api *API) callBytes(method string, params interface{}) (b []byte, err error) {
+	// Ensure version info is available (but skip for APIInfo.version to avoid recursion)
+	useBearer := false
+	if method != "APIInfo.version" {
+		if api.versionInfo == nil {
+			_, err = api.Version()
+			if err != nil {
+				return
+			}
+		}
+		useBearer = api.versionInfo.UseBearer
+	}
+
 	id := atomic.AddInt32(&api.id, 1)
 	var jsonobj request
 
-	// 7.2及以上版本完全不需要auth字段
-	if isZbx64 {
+	// Zabbix 7.4+ uses Bearer token in header, no auth in JSON body
+	// Zabbix < 7.4 uses auth field in JSON body
+	if useBearer {
 		jsonobj = request{
 			Jsonrpc: "2.0",
 			Method:  method,
@@ -101,7 +123,7 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 			Id:      id,
 		}
 	} else {
-		// 6.4以下版本需要auth字段
+		// Older versions need auth field in JSON body
 		auth := ""
 		if method != "APIInfo.version" {
 			auth = api.Auth
@@ -134,8 +156,8 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 	req.Header.Add("Content-Type", "application/json-rpc")
 	req.Header.Add("User-Agent", "github.com/AlekSi/zabbix")
 
-	// 6.4及以上版本使用Bearer认证
-	if isZbx64 && method != "APIInfo.version" {
+	// Zabbix 7.4+ uses Bearer token in Authorization header
+	if useBearer && method != "APIInfo.version" && api.Auth != "" {
 		req.Header.Add("Authorization", "Bearer "+api.Auth)
 	}
 
@@ -177,14 +199,17 @@ func (api *API) CallWithError(method string, params interface{}) (response Respo
 // Calls "user.login" API method and fills api.Auth field.
 // This method modifies API structure and should not be called concurrently with other methods.
 func (api *API) Login(user, password string) (auth string, err error) {
-	// 先获取版本并设置isZbx64
-	_, err = api.Version()
-	if err != nil {
-		return
+	// Ensure version info is available
+	if api.versionInfo == nil {
+		_, err = api.Version()
+		if err != nil {
+			return
+		}
 	}
 
+	// Zabbix 6.4+ uses "username", older versions use "user"
 	key := "user"
-	if isZbx64 {
+	if api.versionInfo.UseUsername {
 		key = "username"
 	}
 
@@ -202,9 +227,9 @@ func (api *API) Login(user, password string) (auth string, err error) {
 	return
 }
 
-// Calls "APIInfo.version" API method.
+// Calls "APIInfo.version" API method and caches version information.
 func (api *API) Version() (v string, err error) {
-	// APIInfo.version 方法不需要认证
+	// APIInfo.version doesn't require authentication
 	response, err := api.CallWithError("APIInfo.version", Params{})
 	if err != nil {
 		return
@@ -212,19 +237,41 @@ func (api *API) Version() (v string, err error) {
 
 	v = response.Result.(string)
 
-	// 判断版本并设置认证方式
+	// Parse version string (e.g., "7.4.0")
 	verArr := strings.Split(v, ".")
-	ZbxMasterVer, _ := strconv.ParseInt(verArr[0], 10, 64)
-	ZbxMiddleVer, _ := strconv.ParseInt(verArr[1], 10, 64)
+	if len(verArr) < 2 {
+		return v, fmt.Errorf("invalid version format: %s", v)
+	}
 
-	isZbx64 = ZbxMasterVer > 6 || (ZbxMasterVer == 6 && ZbxMiddleVer >= 4)
-	return
+	major, _ := strconv.ParseInt(verArr[0], 10, 64)
+	minor, _ := strconv.ParseInt(verArr[1], 10, 64)
+	patch := int64(0)
+	if len(verArr) >= 3 {
+		patch, _ = strconv.ParseInt(verArr[2], 10, 64)
+	}
+
+	// Cache version information
+	api.versionInfo = &VersionInfo{
+		Version:     v,
+		Major:       major,
+		Minor:       minor,
+		Patch:       patch,
+		UseBearer:   major > 7 || (major == 7 && minor >= 4), // Zabbix 7.4+ uses Bearer token
+		UseUsername: major > 6 || (major == 6 && minor >= 4), // Zabbix 6.4+ uses "username" instead of "user"
+	}
+
+	return v, nil
 }
 
 // SetAuth sets the authentication token and determines the Zabbix version
 func (api *API) SetAuth(auth string) error {
 	api.Auth = auth
-	// 获取版本并设置isZbx64
+	// Get version to determine authentication method
 	_, err := api.Version()
 	return err
+}
+
+// GetVersionInfo returns cached version information
+func (api *API) GetVersionInfo() *VersionInfo {
+	return api.versionInfo
 }
