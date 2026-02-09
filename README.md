@@ -12,7 +12,7 @@ This Go package provides access to Zabbix API, Zabbix Sender Protocol, and Zabbi
 
 | Zabbix Version | Compatibility | Authentication Method |
 | :------------- | :------------ | :-------------------- |
-| 7.4.x          | ✅            | Bearer Token (Header) |
+| 7.2+           | ✅            | Bearer Token (Header) |
 | 7.2.x          | ✅            | JSON Body Auth        |
 | 7.0.x LTS      | ✅            | JSON Body Auth        |
 | 6.4.x          | ✅            | JSON Body Auth        |

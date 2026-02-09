@@ -22,7 +22,7 @@ type VersionInfo struct {
 	Major       int64
 	Minor       int64
 	Patch       int64
-	UseBearer   bool // true for Zabbix 7.4+
+	UseBearer   bool // true for Zabbix 7.2+
 	UseUsername bool // true for Zabbix 6.4+
 }
 
@@ -113,8 +113,8 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 	id := atomic.AddInt32(&api.id, 1)
 	var jsonobj request
 
-	// Zabbix 7.4+ uses Bearer token in header, no auth in JSON body
-	// Zabbix < 7.4 uses auth field in JSON body
+	// Zabbix 7.2+ uses Bearer token in header, no auth in JSON body
+	// Zabbix < 7.2 uses auth field in JSON body
 	if useBearer {
 		jsonobj = request{
 			Jsonrpc: "2.0",
@@ -156,7 +156,7 @@ func (api *API) callBytes(method string, params interface{}) (b []byte, err erro
 	req.Header.Add("Content-Type", "application/json-rpc")
 	req.Header.Add("User-Agent", "github.com/AlekSi/zabbix")
 
-	// Zabbix 7.4+ uses Bearer token in Authorization header
+	// Zabbix 7.2+ uses Bearer token in Authorization header
 	if useBearer && method != "APIInfo.version" && api.Auth != "" {
 		req.Header.Add("Authorization", "Bearer "+api.Auth)
 	}
@@ -256,7 +256,7 @@ func (api *API) Version() (v string, err error) {
 		Major:       major,
 		Minor:       minor,
 		Patch:       patch,
-		UseBearer:   major > 7 || (major == 7 && minor >= 4), // Zabbix 7.4+ uses Bearer token
+		UseBearer:   major > 7 || (major == 7 && minor >= 2), // Zabbix 7.2+ uses Bearer token
 		UseUsername: major > 6 || (major == 6 && minor >= 4), // Zabbix 6.4+ uses "username" instead of "user"
 	}
 
